@@ -12,7 +12,12 @@ class Main:
 
     @classmethod
     def puller(self, type: str = PSE_ASING):
-        how_much = requests.get(url=f"{self.API}{type}/0.json").json()
+        refresh_timeout = 3
+        try:
+            how_much = requests.get(url=f"{self.API}{type}/0.json").json()
+        except (requests.ConnectionError, requests.HTTPError) as err:
+            print(f"Server PSE down, {err}")
+            return
         columns = ['id', 'type']
         rows = []
         columns.extend(how_much['data'][0]['attributes'].keys())
@@ -20,22 +25,25 @@ class Main:
         for a in range(how_much['meta']['page']['lastPage']):
             try:
                 data = requests.get(url=f"{self.API}{type}/{a}.json")
-                print(data.url)
+                print(f"On Page {a}.json", end="\r")
                 ab = data.json()
             
                 for adf in ab['data']:
                     temp = [adf['id'], adf['type']]
                     temp.extend(adf['attributes'].values())
                     rows.append(temp)
-            except requests.ConnectionError:
-                print("Server PSE down, skipping page")
-                continue
-            except:
-                print("Something wrong on here...")
-                continue
-        
+            except (requests.ConnectionError, requests.HTTPError):
+                if refresh_timeout != 0:
+                    refresh_timeout -= 1
+                    a -= 1
+                    print(f"Failed to pull page {a}.json, trying again")
+                    continue
+                else:
+                    print(f"Failed to pull page {a}.json, passing page")
+                    continue
+
         df = pd.DataFrame(rows, columns=columns)
-        df.to_csv(f'{type}.csv')
+        df.to_csv(f'{type}.csv', index=False)
         
 
     def pse_asing(self, force_update: bool = False):
@@ -43,9 +51,9 @@ class Main:
             if (isfile(self.PSE_ASING+".csv") is False or stat(self.PSE_ASING+".csv").st_size == 0) or force_update:
                 print(f"Pulling {self.PSE_ASING}...")
                 self.puller()
-            print(f'Succefully pulled on {self.PSE_ASING}.csv')
-        except requests.ConnectionError:
-            print("Server PSE down")
+                print(f'Succefully pulled on {self.PSE_ASING}.csv')
+            else:
+                print(f'File already exist {self.PSE_ASING}.csv. Add param force_update=True to override it')
         except Exception as ad:
             print(ad)
 
@@ -54,9 +62,9 @@ class Main:
             if (isfile(self.PSE_LOKAL+".csv") is False or stat(self.PSE_LOKAL+".csv").st_size == 0) or force_update:
                 print(f"Pulling {self.PSE_LOKAL}...")
                 self.puller(type=self.PSE_LOKAL)
-            print(f'Succefully pulled on {self.PSE_LOKAL}.csv')
-        except requests.ConnectionError:
-            print("Server PSE down")
+                print(f'Succefully pulled on {self.PSE_LOKAL}.csv')
+            else:
+                print(f'Succefully pulled on {self.PSE_LOKAL}.csv. Add param force_update=True to override it')
         except Exception as ad:
             print(ad)
 
