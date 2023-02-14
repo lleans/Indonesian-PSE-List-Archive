@@ -40,6 +40,7 @@ class Main:
                     continue
                 else:
                     print(f"Failed to pull page {a}.json, passing page")
+                    refresh_timeout = 3
                     continue
 
         df = pd.DataFrame(rows, columns=columns)
